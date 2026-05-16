@@ -1,16 +1,14 @@
-// src/app/api/admin/ads/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/logger";
-import {   } from "@prisma/client";
+import { $Enums } from "@prisma/client";
 import { z } from "zod";
 
 const adSchema = z.object({
   nomCampagne: z.string().min(2).max(200),
   annonceur: z.string().min(2).max(200),
-  placement: z.string(),
+  placement: z.nativeEnum($Enums.AdPlacement),
   priorite: z.number().min(1).max(10).default(5),
   imageUrl: z.string().url(),
   linkUrl: z.string().url(),
@@ -39,10 +37,7 @@ export async function GET(req: NextRequest) {
   if (placement) where.placement = placement;
 
   const [ads, total] = await Promise.all([
-    prisma.ad.findMany({
-      where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: "desc" },
-      include: { _count: { select: { events: true } } },
-    }),
+    prisma.ad.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: "desc" }, include: { _count: { select: { events: true } } } }),
     prisma.ad.count({ where }),
   ]);
 
@@ -61,10 +56,10 @@ export async function POST(req: NextRequest) {
 
     if (end <= start) return NextResponse.json({ error: "Date fin doit être après date début" }, { status: 422 });
 
-    const statut = start > now ? "PLANIFIE" : end < now ? "EXPIRE" : body.isActive ? "ACTIF" : "PAUSE";
+    const statut: $Enums.AdStatut = start > now ? "PLANIFIE" : end < now ? "EXPIRE" : body.isActive ? "ACTIF" : "PAUSE";
 
     const ad = await prisma.ad.create({
-      data: { ...body, startDate: start, endDate: end, statut: statut as any, creePar: session.user.id },
+      data: { ...body, startDate: start, endDate: end, statut, creePar: session.user.id, cibleUtilisateur: body.cibleUtilisateur as $Enums.AdCibleUtilisateur },
     });
 
     await logAction({ action: "AD_CREEE", userId: session.user.id, cible: ad.id, details: { nomCampagne: body.nomCampagne } });

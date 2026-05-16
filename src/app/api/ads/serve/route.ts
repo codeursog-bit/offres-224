@@ -1,10 +1,10 @@
-// src/app/api/ads/serve/route.ts — Servir une publicité
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { $Enums } from "@prisma/client";
 import { z } from "zod";
 
 const schema = z.object({
-  placement: z.string(),
+  placement: z.nativeEnum($Enums.AdPlacement),
   city: z.string().optional(),
   secteur: z.string().optional(),
 });
@@ -31,7 +31,6 @@ export async function GET(req: NextRequest) {
 
     if (!ad) return NextResponse.json(null);
 
-    // Incrémenter impressions (fire & forget)
     prisma.ad.update({ where: { id: ad.id }, data: { impressionsCount: { increment: 1 } } }).catch(() => {});
 
     return NextResponse.json(ad);

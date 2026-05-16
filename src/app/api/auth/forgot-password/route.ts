@@ -1,4 +1,3 @@
-// src/app/api/auth/forgot-password/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
@@ -12,20 +11,17 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
-    // Toujours retourner success (sécurité — ne pas révéler si l'email existe)
     if (!user) return NextResponse.json({ success: true });
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 3600000); // 1h
+    const expires = new Date(Date.now() + 3600000);
 
     await prisma.verificationToken.upsert({
-      where: { identifier: email },
+      where: { identifier_token: { identifier: email, token: "" } },
       create: { identifier: email, token, expires },
       update: { token, expires },
     });
 
-    // TODO: Envoyer email avec lien de reset
-    // await sendEmail({ to: email, subject: "Réinitialisation mot de passe", body: `...${token}...` })
     console.log(`[RESET PASSWORD] Token pour ${email}: ${token}`);
 
     return NextResponse.json({ success: true });

@@ -1,34 +1,10 @@
-// lib/logger.ts
-import { prisma } from "./prisma";
-import { LogNiveau, Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { $Enums } from "@prisma/client";
 
-/**
- * Enregistre une action dans les logs système.
- * Le type LogNiveau provient directement de ton schéma Prisma.
- */
-export async function logAction(
-  niveau: "info" | "warning" | "error", 
-  action: string, 
-  userId?: string, 
-  details?: any
-) {
+interface LogParams { niveau?: $Enums.LogNiveau; action: string; userId?: string; cible?: string; details?: Record<string, unknown>; ip?: string; userAgent?: string; }
+
+export async function logAction(params: LogParams): Promise<void> {
   try {
-    // Mapping pour transformer tes strings minuscules en Enum Prisma (souvent en MAJUSCULES)
-    const niveauEnum: LogNiveau = 
-      niveau === 'error' ? LogNiveau.ERROR : 
-      niveau === 'warning' ? LogNiveau.WARNING : 
-      LogNiveau.INFO;
-
-    await prisma.logSysteme.create({
-      data: { 
-        niveau: niveauEnum, 
-        action, 
-        userId,
-        // On s'assure que details est compatible avec le type JSON de Prisma
-        details: details ? (details as Prisma.InputJsonValue) : Prisma.DbNull 
-      }
-    });
-  } catch (e) { 
-    console.error("Logging failed:", e); 
-  }
+    await prisma.logSysteme.create({ data: { niveau: params.niveau ?? "INFO", action: params.action, userId: params.userId, cible: params.cible, details: params.details as any, ip: params.ip, userAgent: params.userAgent } });
+  } catch { console.error("[LOGGER]", params.action); }
 }
