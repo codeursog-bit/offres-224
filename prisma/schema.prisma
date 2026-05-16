@@ -1,0 +1,773 @@
+// prisma/schema.prisma — Offres Emploi Sérieuse 242
+// Production-ready · Prisma 5.x · PostgreSQL 14+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+
+enum Role { 
+CANDIDAT
+RH
+SUPER_ADMIN 
+}
+enum ContratType {
+   CDI
+   CDD 
+   STAGE 
+   INTERIM 
+   FREELANCE 
+   TEMPS_PARTIEL
+    }
+enum OffreStatut { 
+  BROUILLON 
+  EN_ATTENTE 
+  PUBLIEE 
+  REFUSEE 
+  MODIFICATION 
+  EXPIREE 
+  ARCHIVEE 
+  }
+enum CandidatureStatut { 
+  ENVOYEE 
+  VUE
+  SHORTLISTED 
+  ENTRETIEN_PREVU 
+  ENTRETIEN_REALISE 
+  OFFRE_RECUE 
+  ACCEPTEE 
+  REFUSEE 
+  ARCHIVEE
+   }
+enum NiveauExperience { 
+  SANS_EXPERIENCE 
+  JUNIOR 
+  INTERMEDIAIRE 
+  SENIOR 
+  EXPERT 
+  }
+enum NiveauFormation { 
+SANS_DIPLOME 
+BEPC 
+BAC 
+BTS_DUT 
+LICENCE 
+MASTER 
+DOCTORAT 
+FORMATION_PRO
+ }
+enum NiveauLangue { 
+  NOTIONS
+  INTERMEDIAIRE 
+  COURANT 
+  BILINGUE 
+  LANGUE_MATERNELLE 
+  }
+enum AdPlacement { 
+  HERO_BANNER 
+  SIDEBAR_SQUARE 
+  FEED_CARD 
+  INTERSTITIEL 
+  FOOTER_BANNER 
+  CONSEILS_INLINE
+   }
+enum AdStatut { 
+  BROUILLON 
+  PLANIFIE 
+  ACTIF 
+  PAUSE 
+  EXPIRE 
+  ARCHIVE 
+  }
+enum AdEventType { 
+  IMPRESSION
+   CLICK
+  DISMISS
+   }
+enum AdCibleUtilisateur { 
+  TOUS
+   NON_CONNECTES 
+   CANDIDATS 
+   RH
+    }
+enum MessageStatut { 
+  ENVOYE 
+  DELIVRE 
+  LU 
+  }
+enum AlerteFrequence { 
+  IMMEDIATE
+ QUOTIDIENNE 
+ HEBDOMADAIRE
+  }
+enum FormationNiveau { 
+  DEBUTANT
+ INTERMEDIAIRE 
+ AVANCE 
+ }
+enum FormationStatut { 
+  BROUILLON
+   PUBLIEE 
+   ARCHIVEE 
+   }
+enum SignalementType { 
+  OFFRE_FRAUDULEUSE 
+  CONTENU_INAPPROPRIE 
+  ENTREPRISE_ARNAQUE 
+  CANDIDAT_SUSPECT 
+  AUTRE
+   }
+enum SignalementStatut { 
+  OUVERT
+   EN_COURS
+   RESOLU
+   REJETE 
+     }
+enum NotificationType { 
+  NOUVELLE_CANDIDATURE
+ CANDIDATURE_VUE
+  STATUT_CANDIDATURE
+   NOUVEAU_MESSAGE
+    OFFRE_MATCH
+    ALERTE_EMPLOI 
+    OFFRE_VALIDEE 
+    OFFRE_REFUSEE 
+    COMPTE_VERIFIE 
+    SYSTEME
+     }
+enum PipelineEtape {
+   A_CONTACTER
+    CONTACTE 
+    ENTRETIEN 
+    RETENU 
+    REFUSE 
+    }
+enum LogNiveau { 
+INFO 
+WARNING 
+ERROR 
+SUCCESS
+ }
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  emailVerified    DateTime?
+  passwordHash     String?
+  role             Role      @default(CANDIDAT)
+  isActive         Boolean   @default(true)
+  isBanned         Boolean   @default(false)
+  banReason        String?
+  banExpireAt      DateTime?
+  bannedBy         String?
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  profilCandidat        ProfilCandidat?
+  profilEntreprise      ProfilEntreprise?
+  candidatures          Candidature[]
+  offresSauvegardees    OffreSauvegardee[]
+  alertesEmploi         AlerteEmploi[]
+  messagesEnvoyes       Message[]            @relation("Expediteur")
+  conversationsMembres  ConversationMembre[]
+  notifications         Notification[]
+  sessions              Session[]
+  accounts              Account[]
+  signalements          Signalement[]        @relation("Signaleur")
+  avisEntreprises       AvisEntreprise[]
+  formationInscriptions FormationInscription[]
+  adsCreees             Ad[]                 @relation("AdCreateur")
+  logsActions           LogSysteme[]         @relation("LogUser")
+  @@index([email])
+  @@index([role])
+  @@index([isBanned])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model ProfilCandidat {
+  id                 String            @id @default(cuid())
+  userId             String            @unique
+  prenom             String
+  nom                String
+  titreProfessionnel String?
+  photoUrl           String?
+  ville              String?
+  telephone          String?
+  linkedin           String?
+  bio                String?           @db.Text
+  cvFileUrl          String?
+  cvGeneratedUrl     String?
+  niveauFormation    NiveauFormation?
+  niveauExperience   NiveauExperience?
+  salaireSouhaite    Int?
+  disponibilite      String?
+  isPublic           Boolean           @default(true)
+  profilComplete     Int               @default(0)
+  vuesCeMois         Int               @default(0)
+  secteurPrincipal   String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experiences     Experience[]
+  formations      FormationCandidat[]
+  competences     ProfilCompetence[]
+  langues         ProfilLangue[]
+  candidatures    Candidature[]
+  pipelineEntrees PipelineCandidat[]
+  @@index([ville])
+  @@index([niveauExperience])
+  @@index([secteurPrincipal])
+  @@index([isPublic])
+  @@index([profilComplete])
+}
+
+model Experience {
+  id          String         @id @default(cuid())
+  profilId    String
+  poste       String
+  entreprise  String
+  ville       String?
+  dateDebut   DateTime
+  dateFin     DateTime?
+  description String?        @db.Text
+  ordre       Int            @default(0)
+  profil      ProfilCandidat @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  @@index([profilId])
+}
+
+model FormationCandidat {
+  id       String         @id @default(cuid())
+  profilId String
+  diplome  String
+  ecole    String
+  ville    String?
+  annee    Int?
+  mention  String?
+  ordre    Int            @default(0)
+  profil   ProfilCandidat @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  @@index([profilId])
+}
+
+model Competence {
+  id      String             @id @default(cuid())
+  nom     String             @unique
+  secteur String?
+  profils ProfilCompetence[]
+  offres  OffreCompetence[]
+  @@index([nom])
+  @@index([secteur])
+}
+
+model ProfilCompetence {
+  id           String         @id @default(cuid())
+  profilId     String
+  competenceId String
+  niveau       String?
+  profil       ProfilCandidat @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  competence   Competence     @relation(fields: [competenceId], references: [id])
+  @@unique([profilId, competenceId])
+}
+
+model ProfilLangue {
+  id       String         @id @default(cuid())
+  profilId String
+  langue   String
+  niveau   NiveauLangue
+  profil   ProfilCandidat @relation(fields: [profilId], references: [id], onDelete: Cascade)
+  @@unique([profilId, langue])
+}
+
+model ProfilEntreprise {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  nomEntreprise    String
+  secteur          String?
+  tailleEntreprise String?
+  description      String?   @db.Text
+  logoUrl          String?
+  siteWeb          String?
+  adresse          String?
+  ville            String?
+  numeroRCCM       String?
+  isVerifiee       Boolean   @default(false)
+  verifieeAt       DateTime?
+  verifieeBy       String?
+  isSuspendue      Boolean   @default(false)
+  suspendueRaison  String?
+  noteGlobale      Float?
+  nbAvis           Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offres    Offre[]
+  avisRecus AvisEntreprise[]
+  @@index([ville])
+  @@index([secteur])
+  @@index([isVerifiee])
+  @@index([isSuspendue])
+}
+
+model Offre {
+  id                 String            @id @default(cuid())
+  entrepriseId       String
+  titre              String
+  description        String            @db.Text
+  profilRecherche    String?           @db.Text
+  avantages          String?           @db.Text
+  secteur            String?
+  ville              String
+  adresse            String?
+  contratType        ContratType
+  nbrePostes         Int               @default(1)
+  niveauExperience   NiveauExperience?
+  niveauFormation    NiveauFormation?
+  salaireMin         Int?
+  salaireMax         Int?
+  salaireNonDivulgue Boolean           @default(false)
+  dateDebutPoste     DateTime?
+  dateLimite         DateTime?
+  statut             OffreStatut       @default(BROUILLON)
+  isPremium          Boolean           @default(false)
+  isUrgent           Boolean           @default(false)
+  vues               Int               @default(0)
+  noteAdmin          String?           @db.Text
+  motifRefus         String?           @db.Text
+  valideePar         String?
+  valideeAt          DateTime?
+  refuseePar         String?
+  refuseeAt          DateTime?
+  publishedAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  entreprise          ProfilEntreprise  @relation(fields: [entrepriseId], references: [id])
+  candidatures        Candidature[]
+  competencesRequises OffreCompetence[]
+  languesRequises     OffreLangue[]
+  sauvegardees        OffreSauvegardee[]
+  signalements        Signalement[]
+  @@index([statut])
+  @@index([ville])
+  @@index([secteur])
+  @@index([contratType])
+  @@index([publishedAt])
+  @@index([dateLimite])
+  @@index([entrepriseId])
+  @@index([isPremium])
+  @@index([isUrgent])
+}
+
+model OffreCompetence {
+  id           String     @id @default(cuid())
+  offreId      String
+  competenceId String
+  required     Boolean    @default(true)
+  offre        Offre      @relation(fields: [offreId], references: [id], onDelete: Cascade)
+  competence   Competence @relation(fields: [competenceId], references: [id])
+  @@unique([offreId, competenceId])
+}
+
+model OffreLangue {
+  id      String       @id @default(cuid())
+  offreId String
+  langue  String
+  niveau  NiveauLangue
+  offre   Offre        @relation(fields: [offreId], references: [id], onDelete: Cascade)
+  @@unique([offreId, langue])
+}
+
+model OffreSauvegardee {
+  id        String   @id @default(cuid())
+  userId    String
+  offreId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offre     Offre    @relation(fields: [offreId], references: [id], onDelete: Cascade)
+  @@unique([userId, offreId])
+  @@index([userId])
+}
+
+model Candidature {
+  id                  String            @id @default(cuid())
+  offreId             String
+  candidatId          String
+  profilCandidatId    String
+  lettreMotivation    String?           @db.Text
+  cvUrlSnapshot       String?
+  pretentionSalariale Int?
+  source              String?
+  statut              CandidatureStatut @default(ENVOYEE)
+  notesCandidatPrivee String?           @db.Text
+  notesRH             String?           @db.Text
+  scoreCompatibilite  Int?
+  isVuParRH           Boolean           @default(false)
+  vuParRHAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  offre          Offre                         @relation(fields: [offreId], references: [id])
+  candidat       User                          @relation(fields: [candidatId], references: [id])
+  profilCandidat ProfilCandidat                @relation(fields: [profilCandidatId], references: [id])
+  historique     CandidatureStatutHistorique[]
+  entretiens     Entretien[]
+  pipelineEntree PipelineCandidat?
+  @@unique([offreId, candidatId])
+  @@index([statut])
+  @@index([offreId])
+  @@index([candidatId])
+  @@index([createdAt])
+  @@index([isVuParRH])
+}
+
+model CandidatureStatutHistorique {
+  id            String            @id @default(cuid())
+  candidatureId String
+  statut        CandidatureStatut
+  note          String?
+  changedBy     String?
+  createdAt     DateTime          @default(now())
+  candidature   Candidature       @relation(fields: [candidatureId], references: [id], onDelete: Cascade)
+  @@index([candidatureId])
+}
+
+model Entretien {
+  id            String      @id @default(cuid())
+  candidatureId String
+  dateHeure     DateTime
+  type          String
+  lieu          String?
+  lienVideo     String?
+  notes         String?     @db.Text
+  isConfirme    Boolean     @default(false)
+  isRealise     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  candidature   Candidature @relation(fields: [candidatureId], references: [id], onDelete: Cascade)
+  @@index([candidatureId])
+  @@index([dateHeure])
+}
+
+model PipelineCandidat {
+  id            String         @id @default(cuid())
+  profilId      String
+  candidatureId String?        @unique
+  entrepriseId  String
+  etape         PipelineEtape  @default(A_CONTACTER)
+  noteInterne   String?
+  ordre         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  profil        ProfilCandidat @relation(fields: [profilId], references: [id])
+  candidature   Candidature?   @relation(fields: [candidatureId], references: [id])
+  @@index([entrepriseId])
+  @@index([etape])
+  @@index([profilId])
+}
+
+model Conversation {
+  id        String               @id @default(cuid())
+  sujet     String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  membres   ConversationMembre[]
+  messages  Message[]
+  @@index([updatedAt])
+}
+
+model ConversationMembre {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  expediteurId   String
+  contenu        String        @db.Text
+  fichierUrl     String?
+  fichierNom     String?
+  fichierTaille  Int?
+  statut         MessageStatut @default(ENVOYE)
+  isDeleted      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  expediteur     User          @relation("Expediteur", fields: [expediteurId], references: [id])
+  @@index([conversationId])
+  @@index([expediteurId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  titre     String
+  contenu   String
+  lien      String?
+  isLue     Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([isLue])
+  @@index([createdAt])
+}
+
+model AlerteEmploi {
+  id            String            @id @default(cuid())
+  userId        String
+  nom           String
+  motsCles      String?
+  ville         String?
+  secteur       String?
+  contratType   ContratType?
+  salaireMin    Int?
+  niveauExp     NiveauExperience?
+  frequence     AlerteFrequence   @default(QUOTIDIENNE)
+  isActive      Boolean           @default(true)
+  derniereEnvoi DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([isActive])
+  @@index([frequence])
+  @@index([derniereEnvoi])
+}
+
+model Ad {
+  id               String             @id @default(cuid())
+  nomCampagne      String
+  annonceur        String
+  placement        AdPlacement
+  statut           AdStatut           @default(BROUILLON)
+  priorite         Int                @default(5)
+  imageUrl         String
+  linkUrl          String
+  titre            String?
+  description      String?            @db.Text
+  ctaText          String?
+  couleurFond      String             @default("#FFFFFF")
+  startDate        DateTime
+  endDate          DateTime
+  isActive         Boolean            @default(false)
+  cibleVilles      String[]
+  cibleSecteurs    String[]
+  cibleUtilisateur AdCibleUtilisateur @default(TOUS)
+  impressionsCount Int                @default(0)
+  clicksCount      Int                @default(0)
+  creePar          String
+  createur         User               @relation("AdCreateur", fields: [creePar], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  events           AdEventLog[]
+  @@index([placement])
+  @@index([statut])
+  @@index([isActive])
+  @@index([startDate, endDate])
+  @@index([priorite])
+}
+
+model AdEventLog {
+  id        String      @id @default(cuid())
+  adId      String
+  event     AdEventType
+  ipHash    String
+  userAgent String?
+  userId    String?
+  city      String?
+  createdAt DateTime    @default(now())
+  ad        Ad          @relation(fields: [adId], references: [id], onDelete: Cascade)
+  @@index([adId])
+  @@index([event])
+  @@index([createdAt])
+  @@index([adId, event, createdAt])
+  @@index([ipHash, adId])
+}
+
+model FormationCourse {
+  id           String                 @id @default(cuid())
+  titre        String
+  description  String                 @db.Text
+  formateur    String
+  secteur      String?
+  niveau       FormationNiveau        @default(DEBUTANT)
+  dureeHeures  Int?
+  prix         Int?
+  imageUrl     String?
+  videoUrl     String?
+  statut       FormationStatut        @default(BROUILLON)
+  nbInscrits   Int                    @default(0)
+  note         Float?
+  dateDebut    DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  modules      FormationModule[]
+  inscriptions FormationInscription[]
+  avis         FormationAvis[]
+  @@index([statut])
+  @@index([secteur])
+  @@index([niveau])
+}
+
+model FormationModule {
+  id          String          @id @default(cuid())
+  formationId String
+  titre       String
+  contenu     String          @db.Text
+  ordre       Int             @default(0)
+  dureeMin    Int?
+  formation   FormationCourse @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  @@index([formationId])
+}
+
+model FormationInscription {
+  id          String          @id @default(cuid())
+  formationId String
+  userId      String
+  progression Int             @default(0)
+  certifie    Boolean         @default(false)
+  certifieAt  DateTime?
+  createdAt   DateTime        @default(now())
+  formation   FormationCourse @relation(fields: [formationId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
+  @@unique([formationId, userId])
+  @@index([userId])
+}
+
+model FormationAvis {
+  id          String          @id @default(cuid())
+  formationId String
+  userId      String
+  note        Int
+  commentaire String?
+  createdAt   DateTime        @default(now())
+  formation   FormationCourse @relation(fields: [formationId], references: [id])
+  @@unique([formationId, userId])
+}
+
+model Article {
+  id         String    @id @default(cuid())
+  titre      String
+  slug       String    @unique
+  extrait    String?
+  contenu    String    @db.Text
+  categorie  String
+  imageUrl   String?
+  auteur     String
+  tpsLecture Int?
+  vues       Int       @default(0)
+  isPublie   Boolean   @default(false)
+  isFeatured Boolean   @default(false)
+  publieAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  @@index([slug])
+  @@index([categorie])
+  @@index([isPublie])
+  @@index([isFeatured])
+}
+
+model AvisEntreprise {
+  id           String           @id @default(cuid())
+  entrepriseId String
+  userId       String
+  note         Int
+  titre        String?
+  commentaire  String?          @db.Text
+  isAnonyme    Boolean          @default(false)
+  isVerifie    Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  entreprise   ProfilEntreprise @relation(fields: [entrepriseId], references: [id])
+  user         User             @relation(fields: [userId], references: [id])
+  @@unique([entrepriseId, userId])
+  @@index([entrepriseId])
+}
+
+model Signalement {
+  id          String            @id @default(cuid())
+  type        SignalementType
+  statut      SignalementStatut  @default(OUVERT)
+  signaleurId String
+  offreId     String?
+  description String            @db.Text
+  resolution  String?
+  traitePar   String?
+  traiteAt    DateTime?
+  createdAt   DateTime          @default(now())
+  signaleur   User              @relation("Signaleur", fields: [signaleurId], references: [id])
+  offre       Offre?            @relation(fields: [offreId], references: [id])
+  @@index([statut])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model LogSysteme {
+  id        String    @id @default(cuid())
+  niveau    LogNiveau @default(INFO)
+  action    String
+  userId    String?
+  cible     String?
+  details   Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+  user      User?     @relation("LogUser", fields: [userId], references: [id])
+  @@index([niveau])
+  @@index([action])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model Parametre {
+  id        String   @id @default(cuid())
+  cle       String   @unique
+  valeur    String
+  type      String   @default("string")
+  label     String?
+  updatedAt DateTime @updatedAt
+  @@index([cle])
+}
