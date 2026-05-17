@@ -2,13 +2,13 @@
 // Production-ready · Prisma 5.x · PostgreSQL 14+
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
   provider = "postgresql"
 }
-
 
 
 enum Role { 

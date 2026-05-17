@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg"],
+  experimental: {
+    serverComponentsExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg"],
+  },
 };
 
 export default nextConfig;
