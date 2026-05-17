@@ -1,96 +1,126 @@
-// src/app/api/offres/route.ts — Liste offres publiques
+// src/app/api/rh/offres/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAction } from "@/lib/logger";
+import { notifierAdmins } from "@/lib/notifications";
 import { z } from "zod";
 
-export const dynamic = "force-dynamic";
+const emptyToUndefined = z.string().optional().transform(v => v === "" ? undefined : v);
 
-const querySchema = z.object({
-  q: z.string().optional(),
-  ville: z.string().optional(),
-  secteur: z.string().optional(),
-  contrat: z.string().optional(),
-  experience: z.string().optional(),
-  salaireMin: z.coerce.number().optional(),
-  premium: z.enum(["true", "false"]).optional(),
-  page: z.coerce.number().min(1).default(1),
-  sort: z.enum(["recent", "salaire", "pertinence"]).default("recent"),
-  limit: z.coerce.number().min(1).max(50).default(20),
+const createSchema = z.object({
+  titre: z.string().min(5).max(200),
+  description: z.string().min(50).max(10000),
+  profilRecherche: emptyToUndefined,
+  avantages: emptyToUndefined,
+  secteur: emptyToUndefined,
+  ville: z.string().min(2).max(100),
+  adresse: emptyToUndefined,
+  contratType: z.enum(["CDI","CDD","STAGE","INTERIM","FREELANCE","TEMPS_PARTIEL"]),
+  nbrePostes: z.coerce.number().min(1).max(999).default(1),
+  niveauExperience: z.enum(["SANS_EXPERIENCE","JUNIOR","INTERMEDIAIRE","SENIOR","EXPERT"]).optional().or(z.literal("").transform(() => undefined)),
+  niveauFormation: z.enum(["SANS_DIPLOME","BEPC","BAC","BTS_DUT","LICENCE","MASTER","DOCTORAT","FORMATION_PRO"]).optional().or(z.literal("").transform(() => undefined)),
+  salaireMin: z.coerce.number().positive().optional().or(z.literal(0).transform(() => undefined)),
+  salaireMax: z.coerce.number().positive().optional().or(z.literal(0).transform(() => undefined)),
+  salaireNonDivulgue: z.boolean().default(false),
+  dateDebutPoste: emptyToUndefined,
+  dateLimite: emptyToUndefined,
+  competences: z.array(z.string()).max(20).default([]),
+  langues: z.array(z.object({
+    langue: z.string(),
+    niveau: z.enum(["NOTIONS","INTERMEDIAIRE","COURANT","BILINGUE","LANGUE_MATERNELLE"])
+  })).default([]),
 });
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session || (session.user.role !== "RH" && session.user.role !== "SUPER_ADMIN")) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
+  const entreprise = await prisma.profilEntreprise.findUnique({ where: { userId: session.user.id } });
+  if (!entreprise) return NextResponse.json({ error: "Profil entreprise introuvable" }, { status: 404 });
+
+  const statut = req.nextUrl.searchParams.get("statut");
+  const where: any = { entrepriseId: entreprise.id };
+  if (statut) where.statut = statut;
+
+  const offres = await prisma.offre.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { candidatures: true } } },
+  });
+  return NextResponse.json({ data: offres });
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const params = Object.fromEntries(req.nextUrl.searchParams.entries());
-    const { q, ville, secteur, contrat, experience, salaireMin, premium, page, sort, limit } =
-      querySchema.parse(params);
-
-    const skip = (page - 1) * limit;
-    const now = new Date();
-
-    const where: any = {
-      statut: "PUBLIEE",
-      OR: [{ dateLimite: null }, { dateLimite: { gte: now } }],
-    };
-
-    if (q) {
-      where.AND = [
-        {
-          OR: [
-            { titre: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-            { secteur: { contains: q, mode: "insensitive" } },
-          ],
-        },
-      ];
-    }
-    if (ville) where.ville = { contains: ville, mode: "insensitive" };
-    if (secteur) where.secteur = { contains: secteur, mode: "insensitive" };
-    if (contrat) where.contratType = contrat;
-    if (experience) where.niveauExperience = experience;
-    if (salaireMin) where.salaireMin = { gte: salaireMin };
-    if (premium === "true") where.isPremium = true;
-
-    const orderBy: any =
-      sort === "salaire"
-        ? { salaireMax: "desc" }
-        : sort === "pertinence" && q
-        ? { vues: "desc" }
-        : { publishedAt: "desc" };
-
-    const [offres, total] = await Promise.all([
-      prisma.offre.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: {
-          entreprise: {
-            select: { nomEntreprise: true, logoUrl: true, isVerifiee: true, ville: true },
-          },
-          _count: { select: { candidatures: true } },
-        },
-      }),
-      prisma.offre.count({ where }),
-    ]);
-
-    if (offres.length > 0) {
-      prisma.offre
-        .updateMany({ where: { id: { in: offres.map((o: any) => o.id) } }, data: { vues: { increment: 1 } } })
-        .catch(() => {});
+    const session = await auth();
+    if (!session || (session.user.role !== "RH" && session.user.role !== "SUPER_ADMIN")) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    return NextResponse.json({
-      data: offres,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-      hasNext: page * limit < total,
+    const entreprise = await prisma.profilEntreprise.findUnique({ where: { userId: session.user.id } });
+    if (!entreprise) return NextResponse.json({ error: "Profil entreprise introuvable" }, { status: 404 });
+    if (entreprise.isSuspendue) return NextResponse.json({ error: "Compte suspendu" }, { status: 403 });
+
+    const body = createSchema.parse(await req.json());
+
+    if (body.salaireMin && body.salaireMax && body.salaireMin > body.salaireMax) {
+      return NextResponse.json({ error: "Salaire min > salaire max" }, { status: 422 });
+    }
+
+    const offre = await prisma.$transaction(async (tx: any) => {
+      const o = await tx.offre.create({
+        data: {
+          entrepriseId: entreprise.id,
+          titre: body.titre,
+          description: body.description,
+          profilRecherche: body.profilRecherche,
+          avantages: body.avantages,
+          secteur: body.secteur,
+          ville: body.ville,
+          adresse: body.adresse,
+          contratType: body.contratType,
+          nbrePostes: body.nbrePostes,
+          niveauExperience: body.niveauExperience,
+          niveauFormation: body.niveauFormation,
+          salaireMin: body.salaireMin,
+          salaireMax: body.salaireMax,
+          salaireNonDivulgue: body.salaireNonDivulgue,
+          dateDebutPoste: body.dateDebutPoste ? new Date(body.dateDebutPoste) : null,
+          dateLimite: body.dateLimite ? new Date(body.dateLimite) : null,
+          statut: "EN_ATTENTE",
+        },
+      });
+
+      for (const nom of body.competences) {
+        const comp = await tx.competence.upsert({ where: { nom }, create: { nom }, update: {} });
+        await tx.offreCompetence.create({ data: { offreId: o.id, competenceId: comp.id } });
+      }
+
+      if (body.langues.length > 0) {
+        await tx.offreLangue.createMany({ data: body.langues.map((l) => ({ offreId: o.id, ...l })) });
+      }
+
+      return o;
     });
+
+    await notifierAdmins({
+      type: "SYSTEME",
+      titre: "Nouvelle offre à valider",
+      contenu: `${entreprise.nomEntreprise} a soumis : ${body.titre}`,
+      lien: "/admin/validation",
+    });
+
+    await logAction({ action: "OFFRE_SOUMISE", userId: session.user.id, cible: offre.id });
+
+    return NextResponse.json({ success: true, data: { id: offre.id } }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: (err as any).issues?.[0]?.message ?? "Données invalides" }, { status: 422 });
+      return NextResponse.json({ error: err.issues?.[0]?.message ?? "Données invalides" }, { status: 422 });
     }
-    console.error("[OFFRES GET]", err);
+    console.error("[RH OFFRES POST]", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
