@@ -53,6 +53,16 @@ export default function AdminLogs() {
     setCopied(true); setTimeout(()=>setCopied(false),2000);
   };
 
+  const detailRows: [string, React.ReactNode][] = selected ? [
+    ["Action", <span key="action" className="font-mono font-bold">{selected.action}</span>],
+    ["Niveau", <span key="niveau" className={`font-bold px-2 py-0.5 rounded-full text-xs ${NIVEAU_STYLES[selected.niveau]?.bg} ${NIVEAU_STYLES[selected.niveau]?.text}`}>{selected.niveau}</span>],
+    ["Date", new Date(selected.createdAt).toLocaleString("fr-FR")],
+    ["Utilisateur", selected.user?.email||selected.userId||"—"],
+    ["Cible", selected.cible||"—"],
+    ["IP", selected.ip||"—"],
+    ["User-Agent", selected.userAgent||"—"],
+  ] : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -155,18 +165,10 @@ export default function AdminLogs() {
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3 text-sm mb-4">
-                {[
-                  ["Action",<span className="font-mono font-bold">{selected.action}</span>],
-                  ["Niveau",<span className={`font-bold px-2 py-0.5 rounded-full text-xs ${NIVEAU_STYLES[selected.niveau]?.bg} ${NIVEAU_STYLES[selected.niveau]?.text}`}>{selected.niveau}</span>],
-                  ["Date",new Date(selected.createdAt).toLocaleString("fr-FR")],
-                  ["Utilisateur",selected.user?.email||selected.userId||"—"],
-                  ["Cible",selected.cible||"—"],
-                  ["IP",selected.ip||"—"],
-                  ["User-Agent",selected.userAgent||"—"],
-                ].map(([k,v])=>(
-                  <div key={String(k)} className="flex gap-3">
+                {detailRows.map(([k, v]) => (
+                  <div key={k} className="flex gap-3">
                     <span className="text-gray-500 text-xs w-24 shrink-0 pt-0.5">{k}</span>
-                    <div className="text-gray-900 text-xs break-all">{v as any}</div>
+                    <div className="text-gray-900 text-xs break-all">{v}</div>
                   </div>
                 ))}
               </div>
