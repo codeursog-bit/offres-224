@@ -22,8 +22,8 @@ enum ContratType {
    CDD 
    STAGE 
    INTERIM 
-   FREELANCE 
    TEMPS_PARTIEL
+   FREELANCE 
     }
 enum OffreStatut { 
   BROUILLON 
