@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email: credentials.email as string }
         });
 
-        // Correction du problème bcrypt : on s'assure que passwordHash est une string
         if (!user || !user.passwordHash) return null;
         if (!user.isActive || user.isBanned) throw new Error("Compte désactivé");
 
