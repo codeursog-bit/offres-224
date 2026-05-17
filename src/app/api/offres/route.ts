@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const querySchema = z.object({
   q: z.string().optional(),
   ville: z.string().optional(),
   secteur: z.string().optional(),
-  contrat: z.string().optional().optional(),
-  experience: z.string().optional().optional(),
+  contrat: z.string().optional(),
+  experience: z.string().optional(),
   salaireMin: z.coerce.number().optional(),
   premium: z.enum(["true", "false"]).optional(),
   page: z.coerce.number().min(1).default(1),
@@ -71,7 +73,6 @@ export async function GET(req: NextRequest) {
       prisma.offre.count({ where }),
     ]);
 
-    // Incrémenter vues en batch (fire and forget)
     if (offres.length > 0) {
       prisma.offre
         .updateMany({ where: { id: { in: offres.map((o: any) => o.id) } }, data: { vues: { increment: 1 } } })
