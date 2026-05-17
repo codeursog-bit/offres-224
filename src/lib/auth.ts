@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/lib/logger";
-
-const bcrypt = require("bcryptjs");
+import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),

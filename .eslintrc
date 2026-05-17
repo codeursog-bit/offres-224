@@ -5,5 +5,13 @@
     "@typescript-eslint/no-require-imports": "off",
     "@next/next/no-img-element": "off",
     "react-hooks/exhaustive-deps": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/auth.ts"],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off"
+      }
+    }
+  ]
 }
